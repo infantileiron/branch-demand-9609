@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>网点区间汇总核对 · 缺日补齐</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">栖川 / 区间汇总对账台 <span class="eyebrow">INTERVAL RECONCILE</span></div>
+  <div class="branch-pick">网点
+    <select id="branch"></select>
+    <button id="refresh" class="ghost">刷新</button>
+  </div>
+</header>
+<div class="layout">
+  <nav>
+    <button data-tab="forms" class="active">01 区间单据</button>
+    <button data-tab="daily">02 日量与来源</button>
+    <button data-tab="forecast">03 预测受理</button>
+    <button data-tab="audit">04 操作审计</button>
+    <p class="eyebrow">交叠单据共同约束<br>唯一解才补齐 · 已有日量不改</p>
+  </nav>
+  <main>
+    <div class="intro">
+      <div>
+        <div class="eyebrow" id="tab-eyebrow">FORMS / 01</div>
+        <h1 id="tab-title">区间汇总单据</h1>
+        <p id="tab-desc">按网点登记起止日与总量；待核对单据可试算约束、核对生效。交叠单据对同一批缺日形成联立方程，仅当全部缺日有唯一非负整数解时自动补齐，补齐值保留来源单据。</p>
+      </div>
+      <span class="tag" id="stat-tag">—</span>
+    </div>
+    <p id="error" class="error"></p>
+    <p id="ok" class="ok"></p>
+
+    <!-- 单据 -->
+    <section id="tab-forms" class="tab">
+      <div class="split">
+        <div class="panel">
+          <h2>单据列表</h2>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>ID</th><th>起</th><th>止</th><th>总量</th><th>状态</th><th>版本</th><th>操作</th></tr></thead>
+              <tbody id="forms-body"></tbody>
+            </table>
+          </div>
+          <h2>试算结果（不写数据）</h2>
+          <div id="check-out" class="notice">选择网点后自动试算…</div>
+        </div>
+        <aside class="side">
+          <h2 id="form-form-title">登记区间单据</h2>
+          <form id="form-form">
+            <input type="hidden" name="id">
+            <label>起始日<input type="date" name="start_day" required></label>
+            <label>截止日<input type="date" name="end_day" required></label>
+            <label>区间总量（非负整数）<input type="number" name="total" min="0" step="1" required></label>
+            <button class="primary" id="form-submit">登记单据</button>
+            <button type="button" id="form-reset" class="ghost">清空（回到登记模式）</button>
+          </form>
+          <p class="hint">更正生效单据会连同原补齐值整套重算；约束失败则保留原数据。</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 日量 -->
+    <section id="tab-daily" class="tab" hidden>
+      <div class="split">
+        <div class="panel">
+          <h2>日量台账（来源可追溯）</h2>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>日期</th><th>日量</th><th>来源</th><th>来源单据</th><th>更新时间</th><th>操作</th></tr></thead>
+              <tbody id="daily-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <aside class="side">
+          <h2 id="daily-form-title">日结上报 / 人工修订</h2>
+          <form id="daily-form">
+            <label>日期<input type="date" name="day" required></label>
+            <label>日量（非负整数）<input type="number" name="volume" min="0" step="1" required></label>
+            <label>来源
+              <select name="source">
+                <option value="reported">日结上报 reported</option>
+                <option value="manual">人工修订 manual</option>
+              </select>
+            </label>
+            <label>备注<input type="text" name="note" placeholder="修订说明（可选）"></label>
+            <button class="primary">提交固定值并重算</button>
+          </form>
+          <p class="hint">人工修订同样参与约束校验；矛盾时拒绝并保留原数据。补录值(derived)不能直接编辑，只随单据核对/更正重算。</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 预测 -->
+    <section id="tab-forecast" class="tab" hidden>
+      <div class="split">
+        <div class="panel">
+          <h2>已受理预测（冻结依据）</h2>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>目标日</th><th>预测值</th><th>依据哈希</th><th>保留</th><th>受理时间</th><th>依据明细</th></tr></thead>
+              <tbody id="forecast-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <aside class="side">
+          <h2>受理预测</h2>
+          <form id="forecast-form">
+            <label>目标日<input type="date" name="target_day" required></label>
+            <button class="primary">受理（整套一致依据）</button>
+          </form>
+          <p class="hint">覆盖目标日的待核对单据会阻止预测。重复受理时旧预测保留原值，仅标记 retained；依据为全部生效单据 + 已确认日量的哈希快照。</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 审计 -->
+    <section id="tab-audit" class="tab" hidden>
+      <div class="panel">
+        <h2>操作审计（最近 200 条）</h2>
+        <div class="scroll tall">
+          <table>
+            <thead><tr><th>时间</th><th>动作</th><th>明细</th></tr></thead>
+            <tbody id="audit-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
